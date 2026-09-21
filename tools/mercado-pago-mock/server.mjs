@@ -7,7 +7,7 @@ const WEBHOOK_SECRET = process.env.MOCK_WEBHOOK_SECRET ?? 'local-webhook-secret'
 
 const preferences = new Map();
 const payments = new Map();
-let paymentSequence = 1_000_000_000;
+let paymentSequence = Math.floor(Date.now() / 1000);
 
 const OUTCOMES = {
   approved: { status: 'approved', status_detail: 'accredited' },

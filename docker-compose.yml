@@ -6,6 +6,7 @@ x-app: &app
   env_file: .env
   environment:
     NODE_ENV: development
+    APP_PORT: 3000
     DATABASE_URL: postgresql://${PG_USERNAME}:${PG_PASSWORD}@postgres:5432/${PG_DATABASE}
     REDIS_HOST: redis
     REDIS_PORT: 6379

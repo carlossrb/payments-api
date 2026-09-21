@@ -21,3 +21,14 @@ export class InvalidGatewayNotificationError extends DomainError {
     );
   }
 }
+
+export class GatewayPaymentAlreadyLinkedError extends DomainError {
+  constructor(gatewayPaymentId: string | null) {
+    super(
+      DomainErrorKind.CONFLICT,
+      'GATEWAY_PAYMENT_ALREADY_LINKED',
+      `Gateway payment ${gatewayPaymentId} is already linked to another payment`,
+      { gatewayPaymentId },
+    );
+  }
+}
