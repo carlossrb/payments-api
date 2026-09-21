@@ -1,0 +1,149 @@
+x-app: &app
+  build:
+    context: .
+    target: dev
+  image: payments-api:dev
+  env_file: .env
+  environment:
+    NODE_ENV: development
+    DATABASE_URL: postgresql://${PG_USERNAME}:${PG_PASSWORD}@postgres:5432/${PG_DATABASE}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    TEMPORAL_ADDRESS: temporal:7233
+    MERCADO_PAGO_BASE_URL: http://mercado-pago-mock:8081
+    MERCADO_PAGO_NOTIFICATION_URL: http://api:3000/api/webhooks/mercado-pago
+  volumes:
+    - ./src:/app/src
+    - ./nest-cli.json:/app/nest-cli.json
+    - ./tsconfig.json:/app/tsconfig.json
+    - ./tsconfig.build.json:/app/tsconfig.build.json
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: payments-postgres
+    environment:
+      POSTGRES_USER: ${PG_USERNAME}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DATABASE}
+    ports:
+      - '${PG_PORT}:5432'
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${PG_USERNAME} -d ${PG_DATABASE}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: payments-redis
+    ports:
+      - '${REDIS_PORT}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal-postgres:
+    image: postgres:16-alpine
+    container_name: payments-temporal-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    volumes:
+      - temporal-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U temporal']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.29.1
+    container_name: payments-temporal
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    ports:
+      - '7233:7233'
+    volumes:
+      - ./docker/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    container_name: payments-temporal-ui
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - '8080:8080'
+    depends_on:
+      - temporal
+
+  mercado-pago-mock:
+    image: node:24-bookworm-slim
+    container_name: payments-mercado-pago-mock
+    command: node /mock/server.mjs
+    environment:
+      MOCK_PORT: 8081
+      MOCK_PUBLIC_URL: http://localhost:8081
+      MOCK_WEBHOOK_SECRET: ${MERCADO_PAGO_WEBHOOK_SECRET}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - '8081:8081'
+    volumes:
+      - ./tools/mercado-pago-mock:/mock:ro
+
+  migrations:
+    <<: *app
+    container_name: payments-migrations
+    command: pnpm migrate:deploy
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    container_name: payments-api
+    command: pnpm start:dev
+    ports:
+      - '${APP_PORT}:3000'
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      mercado-pago-mock:
+        condition: service_started
+
+  worker:
+    <<: *app
+    container_name: payments-worker
+    command: pnpm start:worker:dev
+    restart: unless-stopped
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      mercado-pago-mock:
+        condition: service_started
+
+volumes:
+  postgres:
+  temporal-postgres:

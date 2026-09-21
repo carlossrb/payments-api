@@ -1,0 +1,138 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**/*.ts",
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.json",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/coverage",
+      "!**/prisma/migrations"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "off"
+      },
+      "style": {
+        "useImportType": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "src/domain/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@application/**",
+                      "@infrastructure/**",
+                      "@presentation/**",
+                      "@nestjs/**",
+                      "@prisma/**"
+                    ],
+                    "message": "domain must not depend on outer layers or frameworks."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/application/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@infrastructure/**",
+                      "@presentation/**",
+                      "@prisma/**",
+                      "@temporalio/**",
+                      "redis"
+                    ],
+                    "message": "application must not depend on infrastructure or presentation: declare a port and bind it in a module."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/infrastructure/temporal/workflows/**",
+        "!src/infrastructure/temporal/workflows/**/*.spec.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@nestjs/**",
+                      "@prisma/**",
+                      "@infrastructure/**",
+                      "@presentation/**",
+                      "node:*"
+                    ],
+                    "message": "workflow code runs in the Temporal sandbox and must stay deterministic."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAIL
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model Payment {
+  id                  String        @id @db.Uuid
+  cpf                 String        @db.VarChar(11)
+  description         String        @db.VarChar(255)
+  amount              Decimal       @db.Decimal(12, 2)
+  paymentMethod       PaymentMethod @map("payment_method")
+  status              PaymentStatus @default(PENDING)
+  checkoutUrl         String?       @map("checkout_url") @db.VarChar(2083)
+  gatewayPreferenceId String?       @map("gateway_preference_id") @db.VarChar(255)
+  gatewayPaymentId    String?       @unique @map("gateway_payment_id") @db.VarChar(255)
+  failureReason       String?       @map("failure_reason") @db.VarChar(255)
+  paidAt              DateTime?     @map("paid_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@index([cpf])
+  @@index([paymentMethod])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model OutboxEvent {
+  id            String            @id @db.Uuid
+  eventName     String            @map("event_name") @db.VarChar(100)
+  payload       Json
+  status        OutboxEventStatus @default(PENDING)
+  attempts      Int               @default(0)
+  nextAttemptAt DateTime          @default(now()) @map("next_attempt_at")
+  lastError     String?           @map("last_error") @db.VarChar(1000)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([status, updatedAt])
+  @@map("outbox_events")
+}
